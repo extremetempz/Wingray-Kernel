@@ -228,7 +228,7 @@ static const struct tegra_emc_table stingray_emc_tables_samsung[] = {
 		}
 	},
 	{
-		.rate = 400000,   /* SDRAM frequency */
+		.rate = 300000,   /* SDRAM frequency */
 		.regs = {
 			0x00000012,   /* RC */
 			0x00000027,   /* RFC */
@@ -486,7 +486,7 @@ static const struct tegra_emc_table stingray_emc_tables_elpida_50nm[] = {
 		}
 	},
 	{
-		.rate = 400000,   /* SDRAM frequency */
+		.rate = 300000,   /* SDRAM frequency */
 		.regs = {
 			0x00000012,   /* RC */
 			0x00000027,   /* RFC */
@@ -744,7 +744,7 @@ static const struct tegra_emc_table stingray_emc_tables_elpida_40nm[] = {
 		}
 	},
 	{
-		.rate = 400000,   /* SDRAM frequency */
+		.rate = 300000,   /* SDRAM frequency */
 		.regs = {
 			0x00000012,   /* RC */
 			0x00000027,   /* RFC */
