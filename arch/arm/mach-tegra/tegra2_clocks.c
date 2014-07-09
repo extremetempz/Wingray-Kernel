@@ -2222,7 +2222,7 @@ struct clk tegra_list_clks[] = {
 #ifdef CONFIG_TEGRA2_GPUOC_400M
 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	450000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 #else
-	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
+	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	450000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
 #endif
 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	350000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
 	PERIPH_CLK("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
