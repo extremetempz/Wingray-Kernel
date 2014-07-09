@@ -590,4 +590,11 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/radio_ctrl/Kconfig"
 
+config FSYNC_CONTROL
+ bool "Support for FSync Control"
+ default y
+ help
+ Say Y here to enable FSync Control
+
+
 endif # MISC_DEVICES
