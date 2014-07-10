@@ -67,11 +67,6 @@ MODULE_PARM_DESC(
 	removable,
 	"MMC/SD cards are removable and may be removed during suspend");
 
-#ifdef CONFIG_MACH_BSSQ
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
-struct mmc_ios ios_backup;
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
-#endif
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
  */
@@ -145,7 +140,7 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 		if (mrq->done)
 			mrq->done(mrq);
 
-		mmc_host_clk_release(host);
+		mmc_host_clk_gate(host);
 	}
 }
 
@@ -204,7 +199,7 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 			mrq->stop->mrq = mrq;
 		}
 	}
-	mmc_host_clk_hold(host);
+	mmc_host_clk_ungate(host);
 	led_trigger_event(host->led, LED_FULL);
 	host->ops->request(host, mrq);
 }
@@ -424,7 +419,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			 * The limit is really 250 ms, but that is
 			 * insufficient for some crappy cards.
 			 */
-			limit_us = 300000;
+			limit_us = 800000;
 		else
 			limit_us = 100000;
 
@@ -756,17 +751,15 @@ static inline void mmc_set_ios(struct mmc_host *host)
  */
 void mmc_set_chip_select(struct mmc_host *host, int mode)
 {
-	mmc_host_clk_hold(host);
 	host->ios.chip_select = mode;
 	mmc_set_ios(host);
-	mmc_host_clk_release(host);
 }
 
 /*
  * Sets the host clock to the highest possible frequency that
  * is below "hz".
  */
-static void __mmc_set_clock(struct mmc_host *host, unsigned int hz)
+void mmc_set_clock(struct mmc_host *host, unsigned int hz)
 {
 	WARN_ON(hz < host->f_min);
 
@@ -775,13 +768,6 @@ static void __mmc_set_clock(struct mmc_host *host, unsigned int hz)
 
 	host->ios.clock = hz;
 	mmc_set_ios(host);
-}
-
-void mmc_set_clock(struct mmc_host *host, unsigned int hz)
-{
-	mmc_host_clk_hold(host);
-	__mmc_set_clock(host, hz);
-	mmc_host_clk_release(host);
 }
 
 #ifdef CONFIG_MMC_CLKGATE
@@ -816,7 +802,7 @@ void mmc_ungate_clock(struct mmc_host *host)
 	if (host->clk_old) {
 		BUG_ON(host->ios.clock);
 		/* This call will also set host->clk_gated to false */
-		__mmc_set_clock(host, host->clk_old);
+		mmc_set_clock(host, host->clk_old);
 	}
 }
 
@@ -844,10 +830,19 @@ void mmc_set_ungated(struct mmc_host *host)
  */
 void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode)
 {
-	mmc_host_clk_hold(host);
 	host->ios.bus_mode = mode;
 	mmc_set_ios(host);
-	mmc_host_clk_release(host);
+}
+
+/*
+ * Change data bus width and DDR mode of a host.
+ */
+void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width,
+			   unsigned int ddr)
+{
+	host->ios.bus_width = width;
+	host->ios.ddr = ddr;
+	mmc_set_ios(host);
 }
 
 /*
@@ -855,10 +850,7 @@ void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode)
  */
 void mmc_set_bus_width(struct mmc_host *host, unsigned int width)
 {
-	mmc_host_clk_hold(host);
-	host->ios.bus_width = width;
-	mmc_set_ios(host);
-	mmc_host_clk_release(host);
+	mmc_set_bus_width_ddr(host, width, MMC_SDR_MODE);
 }
 
 /**
@@ -1056,10 +1048,8 @@ u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 
 		ocr &= 3 << bit;
 
-		mmc_host_clk_hold(host);
 		host->ios.vdd = bit;
 		mmc_set_ios(host);
-		mmc_host_clk_release(host);
 	} else {
 		pr_warning("%s: host doesn't support card's voltages\n",
 				mmc_hostname(host));
@@ -1069,58 +1059,13 @@ u32 mmc_select_voltage(struct mmc_host *host, u32 ocr)
 	return ocr;
 }
 
-int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
-{
-	struct mmc_command cmd = {0};
-	int err = 0;
-
-	BUG_ON(!host);
-
-	/*
-	 * Send CMD11 only if the request is to switch the card to
-	 * 1.8V signalling.
-	 */
-	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
-		cmd.opcode = SD_SWITCH_VOLTAGE;
-		cmd.arg = 0;
-		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-
-		err = mmc_wait_for_cmd(host, &cmd, 0);
-		if (err)
-			return err;
-
-		if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
-			return -EIO;
-	}
-
-	host->ios.signal_voltage = signal_voltage;
-
-	if (host->ops->start_signal_voltage_switch)
-		err = host->ops->start_signal_voltage_switch(host, &host->ios);
-
-	return err;
-}
-
 /*
  * Select timing parameters for host.
  */
 void mmc_set_timing(struct mmc_host *host, unsigned int timing)
 {
-	mmc_host_clk_hold(host);
 	host->ios.timing = timing;
 	mmc_set_ios(host);
-	mmc_host_clk_release(host);
-}
-
-/*
- * Select appropriate driver type for host.
- */
-void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
-{
-	mmc_host_clk_hold(host);
-	host->ios.drv_type = drv_type;
-	mmc_set_ios(host);
-	mmc_host_clk_release(host);
 }
 
 /*
@@ -1137,8 +1082,6 @@ void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
 static void mmc_power_up(struct mmc_host *host)
 {
 	int bit;
-
-	mmc_host_clk_hold(host);
 
 	/* If ocr is set, we use it */
 	if (host->ocr)
@@ -1175,14 +1118,10 @@ static void mmc_power_up(struct mmc_host *host)
 	 * time required to reach a stable voltage.
 	 */
 	mmc_delay(10);
-
-	mmc_host_clk_release(host);
 }
 
 static void mmc_power_off(struct mmc_host *host)
 {
-	mmc_host_clk_hold(host);
-
 	host->ios.clock = 0;
 	host->ios.vdd = 0;
 
@@ -1200,8 +1139,6 @@ static void mmc_power_off(struct mmc_host *host)
 	host->ios.bus_width = MMC_BUS_WIDTH_1;
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
-
-	mmc_host_clk_release(host);
 }
 
 /*
@@ -1602,7 +1539,6 @@ out:
 int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	      unsigned int arg)
 {
-#if 0
 	unsigned int rem, to = from + nr;
 
 	if (!(card->host->caps & MMC_CAP_ERASE) ||
@@ -1655,9 +1591,6 @@ int mmc_erase(struct mmc_card *card, unsigned int from, unsigned int nr,
 	to -= 1;
 
 	return mmc_do_erase(card, from, to, arg);
-#else
-        return -EOPNOTSUPP;
-#endif
 }
 EXPORT_SYMBOL(mmc_erase);
 
@@ -1960,34 +1893,38 @@ int mmc_suspend_host(struct mmc_host *host)
 
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
-		if (host->bus_ops->suspend)
-			err = host->bus_ops->suspend(host);
-		if (err == -ENOSYS || !host->bus_ops->resume) {
-			/*
-			 * We simply "remove" the card in this case.
-			 * It will be redetected on resume.
-			 */
-			if (host->bus_ops->remove)
-				host->bus_ops->remove(host);
-			mmc_claim_host(host);
-			mmc_detach_bus(host);
-			mmc_release_host(host);
-			host->pm_flags = 0;
-			err = 0;
+		/*
+		 * A long response time is not acceptable for device drivers
+		 * when doing suspend. Prevent mmc_claim_host in the suspend
+		 * sequence, to potentially wait "forever" by trying to
+		 * pre-claim the host.
+		 */
+		if (mmc_try_claim_host(host)) {
+			if (host->bus_ops->suspend)
+				err = host->bus_ops->suspend(host);
+			mmc_do_release_host(host);
+
+			if (err == -ENOSYS || !host->bus_ops->resume) {
+				/*
+				 * We simply "remove" the card in this case.
+				 * It will be redetected on resume.
+				 */
+				if (host->bus_ops->remove)
+					host->bus_ops->remove(host);
+				mmc_claim_host(host);
+				mmc_detach_bus(host);
+				mmc_release_host(host);
+				host->pm_flags = 0;
+				err = 0;
+			}
+			flush_delayed_work(&host->disable);
+		} else {
+			err = -EBUSY;
 		}
-		flush_delayed_work(&host->disable);
 	}
 	mmc_bus_put(host);
-#ifdef CONFIG_MACH_BSSQ
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
-	if(!strncmp(mmc_hostname(host),"mmc1",4))
-	{
-		memcpy(&ios_backup,&host->ios,sizeof(struct mmc_ios));
-		printk("\n(IOS backup)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
-	}
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
-#endif
-	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
+
+	if (!err && !mmc_card_keep_power(host))
 		mmc_power_off(host);
 
 	return err;
@@ -2011,7 +1948,7 @@ int mmc_resume_host(struct mmc_host *host)
 	}
 
 	if (host->bus_ops && !host->bus_dead) {
-		if (!(host->pm_flags & MMC_PM_KEEP_POWER)) {
+		if (!mmc_card_keep_power(host)) {
 			mmc_power_up(host);
 			mmc_select_voltage(host, host->ocr);
 			/*
@@ -2036,16 +1973,6 @@ int mmc_resume_host(struct mmc_host *host)
 			err = 0;
 		}
 	}
-#ifdef CONFIG_MACH_BSSQ
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [S]
-	if(!strncmp(mmc_hostname(host),"mmc1",4))
-	{
-		memcpy(&host->ios,&ios_backup,sizeof(struct mmc_ios));
-		mmc_set_ios(host);
-		printk("\n(IOS restore)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u  width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
-	}
-// 20111015 youngjin.yoo@lge.com blocking SDcard re-init LGE SDCard_Task [E]
-#endif
 	mmc_bus_put(host);
 
 	return err;
