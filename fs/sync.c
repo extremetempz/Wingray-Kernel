@@ -18,6 +18,10 @@
 #include <linux/backing-dev.h>
 #include "internal.h"
 
+#ifdef CONFIG_DYNAMIC_FSYNC
+extern bool early_suspend_active;
+#endif
+
 #define VALID_FLAGS (SYNC_FILE_RANGE_WAIT_BEFORE|SYNC_FILE_RANGE_WRITE| \
 SYNC_FILE_RANGE_WAIT_AFTER)
 
@@ -91,7 +95,7 @@ __sync_filesystem(sb, *(int *)arg);
 * Sync all the data for all the filesystems (called by sys_sync() and
 * emergency sync)
 */
-static void sync_filesystems(int wait)
+void sync_filesystems(int wait)
 {
 iterate_supers(sync_one_sb, &wait);
 }
@@ -181,6 +185,11 @@ int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 
 struct address_space *mapping = file->f_mapping;
 int err, ret;
+
+#ifdef CONFIG_DYNAMIC_FSYNC
+	 if (!early_suspend_active)
+	 return 0;
+#endif
 
 if (!file->f_op || !file->f_op->fsync) {
 ret = -EINVAL;
@@ -272,6 +281,11 @@ return do_fsync(fd, 1);
 */
 int generic_write_sync(struct file *file, loff_t pos, loff_t count)
 {
+#ifdef CONFIG_DYNAMIC_FSYNC
+	 if (!early_suspend_active)
+ 	return 0;
+#endif
+
 #ifdef CONFIG_FSYNC_CONTROL
 	if (!fsynccontrol_fsync_enabled())
 	    return 0;
@@ -340,6 +354,11 @@ struct address_space *mapping;
 loff_t endbyte;	/* inclusive */
 int fput_needed;
 umode_t i_mode;
+
+#ifdef CONFIG_DYNAMIC_FSYNC
+ 	if (!early_suspend_active)
+ 	return 0;
+#endif
 
 #ifdef CONFIG_FSYNC_CONTROL
 	if (!fsynccontrol_fsync_enabled())
@@ -434,6 +453,10 @@ when they introduce new system calls */
 SYSCALL_DEFINE(sync_file_range2)(int fd, unsigned int flags,
 loff_t offset, loff_t nbytes)
 {
+#ifdef CONFIG_DYNAMIC_FSYNC
+	if (!early_suspend_active)
+	return 0;
+#endif
 return sys_sync_file_range(fd, offset, nbytes, flags);
 }
 #ifdef CONFIG_HAVE_SYSCALL_WRAPPERS
