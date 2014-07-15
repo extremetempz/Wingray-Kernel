@@ -191,7 +191,7 @@ static struct regulator_init_data stingray_panel_reg_initdata = {
 
 static struct fixed_voltage_config stingray_panel_reg_config = {
 	.supply_name		= "stingray_panel_reg",
-	.microvolts		= 5000000,
+	.microvolts		= 4000000,
 	.gpio			= STINGRAY_LVDS_SHDN_B,
 	.startup_delay		= 200000,
 	.enable_high		= 1,
