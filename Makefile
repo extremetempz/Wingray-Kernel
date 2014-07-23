@@ -239,8 +239,8 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer  -ftree-vectorize  -ffast-math --param l2-cache-size=1024 --param l1-cache-size=32 --param l1-cache-line-size=128 -ftree-vectorize -funswitch-loops -fmodulo-sched -fivopts -ftree-loop-ivcanon -ftree-loop-im -fgcse-after-reload -fgcse-sm -fgcse-las 
+HOSTCXXFLAGS = -O2 -fomit-frame-pointer  -ftree-vectorize  -ffast-math --param l2-cache-size=1024 --param l1-cache-size=32 --param l1-cache-line-size=128 -ftree-vectorize -funswitch-loops -fmodulo-sched -fivopts -ftree-loop-ivcanon -ftree-loop-im -fgcse-after-reload -fgcse-sm -fgcse-las 
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
