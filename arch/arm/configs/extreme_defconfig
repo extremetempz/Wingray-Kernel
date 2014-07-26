@@ -436,7 +436,7 @@ CONFIG_UACCESS_WITH_MEMCPY=y
 #
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="mem=448M@0M console=ttyS0,115200n8 earlyprintk init=/bin/ash"
+CONFIG_CMDLINE="mem=448M@0M video=800x1280-32@60 console=ttyS0,115200n8 earlyprintk init=/bin/ash" 
 # CONFIG_CMDLINE_FORCE is not set
 # CONFIG_XIP_KERNEL is not set
 # CONFIG_KEXEC is not set
